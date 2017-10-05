@@ -37,13 +37,13 @@ int main(int argc, char **argv)
     instruction_buffer[0] = NULL;
     instruction_buffer[1] = NULL;
 
-    struct trace_item *lw_sw_pipeline[3];
+    struct trace_item *lw_sw_pipeline[4];
     lw_sw_pipeline[0] = NULL; // REG/EX
     lw_sw_pipeline[1] = NULL; // EX/MEM
     lw_sw_pipeline[2] = NULL; // MEM/WB
     lw_sw_pipeline[3] = NULL; // WB/Output
 
-    struct trace_item *alu_br_pipeline[3];
+    struct trace_item *alu_br_pipeline[4];
     alu_br_pipeline[0] = NULL; // REG/EX
     alu_br_pipeline[1] = NULL; // EX/MEM
     alu_br_pipeline[2] = NULL; // MEM/WB
@@ -108,18 +108,25 @@ int main(int argc, char **argv)
         alu_br_pipeline[1] = alu_br_pipeline[0];
         alu_br_pipeline[0] = REG[ALU_LOC];
 
-
-
-
-
-
+        // Dynamic Scheduler Logic
         if (((is_lwsw_type(instruction_buffer[0]->type) && is_alubr_type(instruction_buffer[1]->type)) ||
           (is_lwsw_type(instruction_buffer[0]->type) && is_alubr_type(instruction_buffer[1]->type))) && // Check that the two in buffer are different AND
           (!is_branch_jump(instruction_buffer[1]->type)) &&   // Check that first in buffer is not a jump/branch AND
           (!data_dependency(instruction_buffer[0], instruction_buffer[1])) && // Check that there is no data dependence between the two instructions AND
           (!(data_dependency(instruction_buffer[0], REG[LW_LOC]) || data_dependency(instruction_buffer[1], REG[LW_LOC])))) // Check that there is no dependence between buffered instructions and REG instructions
           {
-
+              // Issue both instructions, but first check which is the load word type
+              if (is_lwsw_type(instruction_buffer[1])){
+                  // the first is the lw type
+                  REG[LW_LOC]  = instruction_buffer[1];
+                  REG[ALU_LOC] = instruction_buffer[0];
+              } else {
+                  // the second is the lw type
+                  REG[LW_LOC]  = instruction_buffer[0];
+                  REG[ALU_LOC] = instruction_buffer[1];
+              }
+              instruction_buffer[1] = NULL;
+              instruction_buffer[0] = NULL;
           }
 
         cycle_number++;
