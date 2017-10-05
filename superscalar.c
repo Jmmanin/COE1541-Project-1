@@ -221,14 +221,22 @@ struct trace_item * no_op_initializer()
 
 int is_lwsw_type(char type)
 {
-    if ((type == 3) || (type == 4))
+    if ((type == ti_LOAD) || (type == ti_STORE))
         return 1;
     else
         return 0;
 }
 
 int is_alubr_type(char type){
-    if ((type == 1) || (type == 2) || (type == 5) || (type == 6) || (type == 7))
+    if ((type == ti_RTYPE) || (type == ti_ITYPE) || (is_branch_jump(type)))
+        return 1;
+    else
+        return 0;
+}
+
+
+int is_branch_jump(char type){
+    if((type == ti_BRANCH) || (type == ti_JTYPE) || (type == ti_JRTYPE))
         return 1;
     else
         return 0;
@@ -260,11 +268,4 @@ int load_dependency(struct trace_item *load, struct trace_item *instruction_to_c
     }
     // Reach here if we don't return 1
     return 0;
-}
-
-int is_branch_jump(char type){
-    if((type == 5) || (type == 6) || (type == 8))
-        return 1;
-    else
-        return 0;
 }
