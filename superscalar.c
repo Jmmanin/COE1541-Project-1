@@ -38,14 +38,16 @@ int main(int argc, char **argv)
     instruction_buffer[1] = NULL;
 
     struct trace_item *lw_sw_pipeline[3];
-    lw_sw_pipeline[0] = NULL; // EX/MEM
-    lw_sw_pipeline[1] = NULL; // MEM/WB
-    lw_sw_pipeline[2] = NULL; // WB/Output
+    lw_sw_pipeline[0] = NULL; // REG/EX
+    lw_sw_pipeline[1] = NULL; // EX/MEM
+    lw_sw_pipeline[2] = NULL; // MEM/WB
+    lw_sw_pipeline[3] = NULL; // WB/Output
 
     struct trace_item *alu_br_pipeline[3];
-    alu_br_pipeline[0] = NULL; // EX/MEM
-    alu_br_pipeline[1] = NULL; // MEM/WB
-    alu_br_pipeline[2] = NULL; // WB/Output
+    alu_br_pipeline[0] = NULL; // REG/EX
+    alu_br_pipeline[1] = NULL; // EX/MEM
+    alu_br_pipeline[2] = NULL; // MEM/WB
+    alu_br_pipeline[3] = NULL; // WB/Output
 
     unsigned int cycle_number = 0;
 
@@ -96,169 +98,99 @@ int main(int argc, char **argv)
         if(instruction_buffer[0] == NULL) {instruction_buffer[0] = no_op_initializer();}
 
         // Advance pipelines
+        lw_sw_pipeline[3]  = lw_sw_pipeline[2];
         lw_sw_pipeline[2]  = lw_sw_pipeline[1];
         lw_sw_pipeline[1]  = lw_sw_pipeline[0];
         lw_sw_pipeline[0]  = REG[LW_LOC];
 
+        alu_br_pipeline[3] = alu_br_pipeline[2];
         alu_br_pipeline[2] = alu_br_pipeline[1];
         alu_br_pipeline[1] = alu_br_pipeline[0];
         alu_br_pipeline[0] = REG[ALU_LOC];
 
-        // Check for instructions of opposite types
-        if (is_lwsw_type(instruction_buffer[0]->type) && is_alubr_type(instruction_buffer[1]->type)){
-            // Check for data dependence between the two
-            if (!data_dependency(instruction_buffer[0], instruction_buffer[1])){
-                // No data dependency, check for if first in buffer is branch or jump
-                if (!is_branch_jump(instruction_buffer[1]->type)){
-                    // No branch or jump,
-                    if ((REG[LW_LOC] != NULL) && (REG[LW_LOC]->type == ti_LOAD)){
-                        if ((!load_dependency(REG[LW_LOC], instruction_buffer[0])) && (load_dependency(REG[LW_LOC], instruction_buffer[1]))){
-                            // No load dependency for either
-                            // Now we can issue both instructions
-                            REG[LW_LOC]  = instruction_buffer[0];
-                            REG[ALU_LOC] = instruction_buffer[1];
-
-                            instruction_buffer[0] = NULL;
-                            instruction_buffer[1] = NULL;
-                        }
-                    } else {
-                        // Don't have to worry about dependency since there's no load word in REG
-                        REG[LW_LOC]  = instruction_buffer[0];
-                        REG[ALU_LOC] = instruction_buffer[1];
-
-                        instruction_buffer[0] = NULL;
-                        instruction_buffer[1] = NULL;
-                    }
-                }
-            }
-        // Check alternate combination of types
-        } else if (is_lwsw_type(instruction_buffer[1]->type) && is_alubr_type(instruction_buffer[0]->type)){
-            // Check for data dependence between the two
-            if (!data_dependency(instruction_buffer[1], instruction_buffer[0])){
-                // No data dependency, check for if first in buffer is branch or jump
-                if (!is_branch_jump(instruction_buffer[1]->type)){
-                    // No branch or jump,
-                    if ((REG[LW_LOC] != NULL) && (REG[LW_LOC]->type == ti_LOAD)){
-                        if ((!load_dependency(REG[LW_LOC], instruction_buffer[0])) && (load_dependency(REG[LW_LOC], instruction_buffer[1]))){
-                            // No load dependency for either
-                            // Now we can issue both instructions
-                            REG[LW_LOC]  = instruction_buffer[0];
-                            REG[ALU_LOC] = instruction_buffer[1];
-
-                            instruction_buffer[0] = NULL;
-                            instruction_buffer[1] = NULL;
-                        }
-                    } else {
-                        // Don't have to worry about dependency since there's no load word in REG
-                        REG[LW_LOC]  = instruction_buffer[0];
-                        REG[ALU_LOC] = instruction_buffer[1];
-
-                        instruction_buffer[0] = NULL;
-                        instruction_buffer[1] = NULL;
-                    }
-                }
-            }
-        // The instructions are of the same type
-        } else {
-            // Check the first instuction for a load-use hazard with REG
-            if(!load_dependency(REG[LW_LOC], instruction_buffer[1])){
-                // Check type of first instruction
-                if (is_lwsw_type(instruction_buffer[1]->type)){
-                    REG[LW_LOC]  = instruction_buffer[1];
-                    REG[ALU_LOC] = no_op_initializer();
-                    instruction_buffer[1] = instruction_buffer[0];
-                    instruction_buffer[0] = NULL;
-                } else if (is_alubr_type(instruction_buffer[1]->type)){
-                    REG[LW_LOC]  = no_op_initializer();
-                    REG[ALU_LOC] = instruction_buffer[1];
-                    instruction_buffer[1] = instruction_buffer[0];
-                    instruction_buffer[0] = NULL;
-                }
-            } else {
-                // Fits no other step, insert two no-ops
-                REG[LW_LOC]  = no_op_initializer();
-                REG[ALU_LOC] = no_op_initializer();
-            }
-        }
+        // Check that the two in buffer are different
+            // Check that first in buffer is not a jump/branch
+                // Check that there is no data dependence between the two instructions
+                    // Check that there is no dependence between buffered instructions and REG instructions
 
         cycle_number++;
 
-        if ((trace_view_on) && (lw_sw_pipeline[2] != NULL) && (alu_br_pipeline[2] != NULL)) {
+        if ((trace_view_on) && (lw_sw_pipeline[3] != NULL) && (alu_br_pipeline[3] != NULL)) {
             // Print first completed instruction
-            switch(lw_sw_pipeline[2]->type) {
+            switch(lw_sw_pipeline[3]->type) {
                 case ti_NOP:
-                free(lw_sw_pipeline[2]);
+                free(lw_sw_pipeline[3]);
                 printf("[cycle %d] NOP:\n",cycle_number) ;
                 break;
                 case ti_RTYPE:
                 printf("[cycle %d] RTYPE:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(dReg: %d) \n", lw_sw_pipeline[2]->PC, lw_sw_pipeline[2]->sReg_a, lw_sw_pipeline[2]->sReg_b, lw_sw_pipeline[2]->dReg);
+                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(dReg: %d) \n", lw_sw_pipeline[3]->PC, lw_sw_pipeline[3]->sReg_a, lw_sw_pipeline[3]->sReg_b, lw_sw_pipeline[3]->dReg);
                 break;
                 case ti_ITYPE:
                 printf("[cycle %d] ITYPE:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", lw_sw_pipeline[2]->PC, lw_sw_pipeline[2]->sReg_a, lw_sw_pipeline[2]->dReg, lw_sw_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", lw_sw_pipeline[3]->PC, lw_sw_pipeline[3]->sReg_a, lw_sw_pipeline[3]->dReg, lw_sw_pipeline[3]->Addr);
                 break;
                 case ti_LOAD:
                 printf("[cycle %d] LOAD:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", lw_sw_pipeline[2]->PC, lw_sw_pipeline[2]->sReg_a, lw_sw_pipeline[2]->dReg, lw_sw_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", lw_sw_pipeline[3]->PC, lw_sw_pipeline[3]->sReg_a, lw_sw_pipeline[3]->dReg, lw_sw_pipeline[3]->Addr);
                 break;
                 case ti_STORE:
                 printf("[cycle %d] STORE:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", lw_sw_pipeline[2]->PC, lw_sw_pipeline[2]->sReg_a, lw_sw_pipeline[2]->sReg_b, lw_sw_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", lw_sw_pipeline[3]->PC, lw_sw_pipeline[3]->sReg_a, lw_sw_pipeline[3]->sReg_b, lw_sw_pipeline[3]->Addr);
                 break;
                 case ti_BRANCH:
                 printf("[cycle %d] BRANCH:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", lw_sw_pipeline[2]->PC, lw_sw_pipeline[2]->sReg_a, lw_sw_pipeline[2]->sReg_b, lw_sw_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", lw_sw_pipeline[3]->PC, lw_sw_pipeline[3]->sReg_a, lw_sw_pipeline[3]->sReg_b, lw_sw_pipeline[3]->Addr);
                 break;
                 case ti_JTYPE:
                 printf("[cycle %d] JTYPE:",cycle_number) ;
-                printf(" (PC: %x)(addr: %x)\n", lw_sw_pipeline[2]->PC,lw_sw_pipeline[2]->Addr);
+                printf(" (PC: %x)(addr: %x)\n", lw_sw_pipeline[3]->PC,lw_sw_pipeline[3]->Addr);
                 break;
                 case ti_SPECIAL:
                 printf("[cycle %d] SPECIAL:\n",cycle_number) ;
                 break;
                 case ti_JRTYPE:
                 printf("[cycle %d] JRTYPE:",cycle_number) ;
-                printf(" (PC: %x) (sReg_a: %d)(addr: %x)\n", lw_sw_pipeline[2]->PC, lw_sw_pipeline[2]->dReg, lw_sw_pipeline[2]->Addr);
+                printf(" (PC: %x) (sReg_a: %d)(addr: %x)\n", lw_sw_pipeline[3]->PC, lw_sw_pipeline[3]->dReg, lw_sw_pipeline[3]->Addr);
                 break;
             }
 
             // Print first completed instruction
-            switch(alu_br_pipeline[2]->type) {
+            switch(alu_br_pipeline[3]->type) {
                 case ti_NOP:
-                free(alu_br_pipeline[2]);
+                free(alu_br_pipeline[3]);
                 printf("[cycle %d] NOP:\n",cycle_number) ;
                 break;
                 case ti_RTYPE:
                 printf("[cycle %d] RTYPE:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(dReg: %d) \n", alu_br_pipeline[2]->PC, alu_br_pipeline[2]->sReg_a, alu_br_pipeline[2]->sReg_b, alu_br_pipeline[2]->dReg);
+                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(dReg: %d) \n", alu_br_pipeline[3]->PC, alu_br_pipeline[3]->sReg_a, alu_br_pipeline[3]->sReg_b, alu_br_pipeline[3]->dReg);
                 break;
                 case ti_ITYPE:
                 printf("[cycle %d] ITYPE:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", alu_br_pipeline[2]->PC, alu_br_pipeline[2]->sReg_a, alu_br_pipeline[2]->dReg, alu_br_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", alu_br_pipeline[3]->PC, alu_br_pipeline[3]->sReg_a, alu_br_pipeline[3]->dReg, alu_br_pipeline[3]->Addr);
                 break;
                 case ti_LOAD:
                 printf("[cycle %d] LOAD:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", alu_br_pipeline[2]->PC, alu_br_pipeline[2]->sReg_a, alu_br_pipeline[2]->dReg, alu_br_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(dReg: %d)(addr: %x)\n", alu_br_pipeline[3]->PC, alu_br_pipeline[3]->sReg_a, alu_br_pipeline[3]->dReg, alu_br_pipeline[3]->Addr);
                 break;
                 case ti_STORE:
                 printf("[cycle %d] STORE:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", alu_br_pipeline[2]->PC, alu_br_pipeline[2]->sReg_a, alu_br_pipeline[2]->sReg_b, alu_br_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", alu_br_pipeline[3]->PC, alu_br_pipeline[3]->sReg_a, alu_br_pipeline[3]->sReg_b, alu_br_pipeline[3]->Addr);
                 break;
                 case ti_BRANCH:
                 printf("[cycle %d] BRANCH:",cycle_number) ;
-                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", alu_br_pipeline[2]->PC, alu_br_pipeline[2]->sReg_a, alu_br_pipeline[2]->sReg_b, alu_br_pipeline[2]->Addr);
+                printf(" (PC: %x)(sReg_a: %d)(sReg_b: %d)(addr: %x)\n", alu_br_pipeline[3]->PC, alu_br_pipeline[3]->sReg_a, alu_br_pipeline[3]->sReg_b, alu_br_pipeline[3]->Addr);
                 break;
                 case ti_JTYPE:
                 printf("[cycle %d] JTYPE:",cycle_number) ;
-                printf(" (PC: %x)(addr: %x)\n", alu_br_pipeline[2]->PC,alu_br_pipeline[2]->Addr);
+                printf(" (PC: %x)(addr: %x)\n", alu_br_pipeline[3]->PC,alu_br_pipeline[3]->Addr);
                 break;
                 case ti_SPECIAL:
                 printf("[cycle %d] SPECIAL:\n",cycle_number) ;
                 break;
                 case ti_JRTYPE:
                 printf("[cycle %d] JRTYPE:",cycle_number) ;
-                printf(" (PC: %x) (sReg_a: %d)(addr: %x)\n", alu_br_pipeline[2]->PC, alu_br_pipeline[2]->dReg, alu_br_pipeline[2]->Addr);
+                printf(" (PC: %x) (sReg_a: %d)(addr: %x)\n", alu_br_pipeline[3]->PC, alu_br_pipeline[3]->dReg, alu_br_pipeline[3]->Addr);
                 break;
             }
         }
@@ -302,13 +234,15 @@ int is_alubr_type(char type){
         return 0;
 }
 
-int data_dependency(struct trace_item *lwsw_instruction, struct trace_item *alubr_instruction){
-    if (lwsw_instruction->type == ti_LOAD) {
+int data_dependency(struct trace_item *instruct_1, struct trace_item *instruct_2){
+    if (instruct_1->type == ti_LOAD) {
        // Load Word Detected
-       return load_dependency(lwsw_instruction, alubr_instruction);
+       return load_dependency(instruct_1, instruct_2);
+   } else if (instruct_2->type == ti_LOAD){
+       return load_dependency(instruct_2, instruct_1);
+   } else {
+       return 0;
    }
-   // Reach here if we don't return 1
-   return 0;
 
 }
 
