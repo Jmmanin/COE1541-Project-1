@@ -108,10 +108,19 @@ int main(int argc, char **argv)
         alu_br_pipeline[1] = alu_br_pipeline[0];
         alu_br_pipeline[0] = REG[ALU_LOC];
 
-        // Check that the two in buffer are different
-            // Check that first in buffer is not a jump/branch
-                // Check that there is no data dependence between the two instructions
-                    // Check that there is no dependence between buffered instructions and REG instructions
+
+
+
+
+
+        if (((is_lwsw_type(instruction_buffer[0]->type) && is_alubr_type(instruction_buffer[1]->type)) ||
+          (is_lwsw_type(instruction_buffer[0]->type) && is_alubr_type(instruction_buffer[1]->type))) && // Check that the two in buffer are different AND
+          (!is_branch_jump(instruction_buffer[1]->type)) &&   // Check that first in buffer is not a jump/branch AND
+          (!data_dependency(instruction_buffer[0], instruction_buffer[1])) && // Check that there is no data dependence between the two instructions AND
+          (!(data_dependency(instruction_buffer[0], REG[LW_LOC]) || data_dependency(instruction_buffer[1], REG[LW_LOC])))) // Check that there is no dependence between buffered instructions and REG instructions
+          {
+
+          }
 
         cycle_number++;
 
