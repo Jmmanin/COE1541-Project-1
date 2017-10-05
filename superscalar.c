@@ -118,6 +118,26 @@ int main(int argc, char **argv)
                     }
                 }
             }
+        // Check alternate combination of types
+        } else if (is_lwsw_type(instruction_buffer[1]->type) && is_alubr_type(instruction_buffer[0]->type)){
+            // Check for data dependence between the two
+            if (!data_dependency(instruction_buffer[1], instruction_buffer[0])){
+                // No data dependency, check for if first in buffer is branch or jump
+                if (!is_branch_jump(instruction_buffer[1]->type)){
+                    // No branch or jump,
+                    if ((REG[LW_LOC] != NULL) && (REG[LW_LOC]->type == ti_LOAD)){
+                        if ((!load_dependency(REG[LW_LOC], instruction_buffer[0])) && (load_dependency(REG[LW_LOC], instruction_buffer[1]))){
+                            // No load dependency for either
+                            // Now we can issue both instructions
+                            REG[LW_LOC]  = instruction_buffer[0];
+                            REG[ALU_LOC] = instruction_buffer[1];
+
+                            instruction_buffer[0] = NULL;
+                            instruction_buffer[1] = NULL;
+                        }
+                    }
+                }
+            }
         }
 
 
