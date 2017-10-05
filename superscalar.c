@@ -31,7 +31,6 @@ int main(int argc, char **argv)
     int trace_view_on = 0;
     int break_flag = 0;
     int buffer_full = 0;
-
     struct trace_item *REG[2];
     REG[LW_LOC]  = NULL; // lw, sw spot
     REG[ALU_LOC] = NULL; // alu, branch spot
@@ -137,6 +136,22 @@ int main(int argc, char **argv)
                         }
                     }
                 }
+            }
+        // The instructions are of the same type
+        } else {
+            // Check the first instuction for a load-use hazard with REG
+            if(!load_dependency(REG[LW_LOC], instruction_buffer[1])){
+                // Check type of first instruction
+                if (is_lwsw_type(instruction_buffer[1]->type)){
+                    REG[LW_LOC] = instruction_buffer[1];
+                    instruction_buffer[1] = instruction_buffer[0];
+                    instruction_buffer[0] = NULL;
+                } else if (is_alubr_type(instruction_buffer[1]->type)){
+                    REG[ALU_LOC] = instruction_buffer[1];
+                    instruction_buffer[1] = instruction_buffer[0];
+                    instruction_buffer[0] = NULL;
+                }
+
             }
         }
 
