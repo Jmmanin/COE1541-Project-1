@@ -151,7 +151,10 @@ int main(int argc, char **argv)
                     instruction_buffer[1] = instruction_buffer[0];
                     instruction_buffer[0] = NULL;
                 }
-
+            } else {
+                // Fits no other step, insert two no-ops
+                REG[LW_LOC]  = no_op_initializer();
+                REG[ALU_LOC] = no_op_initializer(); 
             }
         }
 
