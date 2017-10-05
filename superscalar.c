@@ -116,7 +116,7 @@ int main(int argc, char **argv)
           (!(data_dependency(instruction_buffer[0], REG[LW_LOC]) || data_dependency(instruction_buffer[1], REG[LW_LOC])))) // Check that there is no dependence between buffered instructions and REG instructions
           {
               // Issue both instructions, but first check which is the load word type
-              if (is_lwsw_type(instruction_buffer[1])){
+              if (is_lwsw_type(instruction_buffer[1]->type)){
                   // the first is the lw type
                   REG[LW_LOC]  = instruction_buffer[1];
                   REG[ALU_LOC] = instruction_buffer[0];
@@ -127,6 +127,28 @@ int main(int argc, char **argv)
               }
               instruction_buffer[1] = NULL;
               instruction_buffer[0] = NULL;
+          }
+          else if (!data_dependency(instruction_buffer[1], REG[LW_LOC]))
+          {
+              //push only the first instruction, figure out which pipeline to send it
+              if (is_lwsw_type(instruction_buffer[1]->type)){
+                  // It's a load word type
+                  REG[LW_LOC]  = instruction_buffer[1];
+                  REG[ALU_LOC] = no_op_initializer();
+              } else {
+                  // It's an ALU/Brand/Jump type
+                  REG[LW_LOC]  = no_op_initializer();
+                  REG[ALU_LOC] = instruction_buffer[1];
+              }
+              // Push the instruction_buffer through by one
+              instruction_buffer[1] = instruction_buffer[0];
+              instruction_buffer[0] = NULL;
+          }
+          else
+          {
+              // push a no-op onto each pipeline
+              REG[LW_LOC]  = no_op_initializer();
+              REG[ALU_LOC] = no_op_initializer();
           }
 
         cycle_number++;
@@ -259,6 +281,10 @@ int is_branch_jump(char type){
 }
 
 int data_dependency(struct trace_item *instruct_1, struct trace_item *instruct_2){
+    // If either are NULL. there cannot be data dependence
+    if ((instruct_1 == NULL) || (instruct_2 == NULL)){
+        return 0;
+    }
     if (instruct_1->type == ti_LOAD) {
        // Load Word Detected
        return load_dependency(instruct_1, instruct_2);
